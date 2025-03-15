@@ -91,11 +91,30 @@ route.post("/join", ensureAuthenticated, async (req, res) => {
     }
 });
 
-route.post('/grade-submission/:id', async (req, res) => {
-    console.log("hello")
+route.post('/grade-submission/:id',upload.single('file'),async (req, res) => {
     try {
-        const submissionId = req.params.id;
-        const submission = await Submission.findById(submissionId);
+        const assignmentId = req.params.id
+        console.log(req.user._id)
+        const studentId = req.user._id
+        console.log("*************************************")
+        console.log(req.file)
+
+        const assignment = await Assignment.findById(assignmentId);
+        const student = await User.findById(studentId);
+        if (!assignment || !student) {
+            return res.status(404).json({ error: "Assignment or Student not found" });
+        }
+
+        const newSubmission = new Submission({
+            assignmentId,
+            studentId,
+            file: {
+                url: req.file.path,
+                filename: req.file.filename,
+            },
+        });
+        const newSub = await newSubmission.save()
+        const submission = await Submission.findById(newSub._id);
 
         if (!submission) {
             return res.status(404).json({ error: 'Submission not found' });
@@ -187,6 +206,38 @@ route.post("/uploadAss",async(req,res)=>{
     const result = await newSubmission.save();
 
     res.send({data:result});
+})
+
+route.get("/getClasses",async(req,res)=>{
+    try {
+        let { _id } = req.user;
+        const classes = await Class.find({ students: _id })
+        .populate({ path: "classTeacher" }) 
+        .populate({ path: "students" }) 
+        .populate({ path: "assignments" }) 
+        
+;
+        res.status(200).send({ classes:classes });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to fetch classes." });
+    }
+})
+
+route.get("/getClass/:id",async(req,res)=>{
+    try{
+        let {id} = req.params;
+        const result = await Class.findById(id)
+        .populate({ path: "classTeacher" }) 
+        .populate({ path: "students" }) 
+        .populate({ path: "assignments" }) ;
+        if(!result){
+            return res.send({msg:"Class Not found for given id"})
+        }
+        res.send({msg:"Class found",class:result})
+    }catch(err){
+        res.send({msg:"Class Not found for given id",error:err})
+    }
 })
 
 

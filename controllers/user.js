@@ -9,12 +9,12 @@ module.exports.registeredUser = async (req,res)=>{
     })
     try{
         let registeredUser = await User.register(newUser,password);
-        req.login(registeredUser,((err)=>{
-            if(err){
-               console.log(err)
+        req.login(registeredUser, (err) => {
+            if (err) {
+                return res.status(500).send({ success: false, msg: "Login after signup failed", error: err.message });
             }
-        }))
-        res.status(200).send({success:true,mas:"User Signed Up Successfully ", data: registeredUser});
+            return res.status(200).send({ success: true, msg: "User Signed Up & Logged In Successfully", data: registeredUser });
+        });
     }
     catch(err){
         res.status(400).send({success:false,msg:'User does not sign up successfully',error:err.message})
@@ -33,3 +33,12 @@ module.exports.loginUser = (req, res) => {
         res.status(401).send({ success: false, message: "Login failed" });
     }
 };
+
+module.exports.logOut = (req,res,next)=>{
+    req.logOut((err)=>{
+        if(err){
+            return next(err)
+        }
+    })
+    res.send({success:true,message:"Logout Successfully"})
+}

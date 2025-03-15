@@ -73,10 +73,10 @@ app.get("/hello",(req,res)=>{
     res.send("Welcome to edumate!!!");
 })
 
-app.get("/debug-session", (req, res) => {
+app.get("/user", (req, res) => {
     console.log("Session:", req.session);
     console.log("User:", req.user);
-    res.json({ session: req.session, user: req.user });
+    res.send({ session: req.session, user: req.user });
 });
 
 app.listen(8080,()=>{

@@ -14,6 +14,7 @@ const aigradingSchema = new Schema({
     },
     errors:{
         type:[String],
+        SuppressReservedKeysWarning: true 
     }
 })
 
