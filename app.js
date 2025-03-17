@@ -68,14 +68,10 @@ app.use('/class',classRouter)
 
 
 app.get("/hello",(req,res)=>{
-    console.log(req.user)
-    console.log(req.session)
     res.send("Welcome to edumate!!!");
 })
 
 app.get("/user", (req, res) => {
-    console.log("Session:", req.session);
-    console.log("User:", req.user);
     res.send({ session: req.session, user: req.user });
 });
 

@@ -18,6 +18,9 @@ const submissionSchema = new Schema({
         url:String,
         filename:String,
     },
+    submitted:{
+        type:Boolean,
+    },
     aiGrade:{
         type:Schema.ObjectId,
         ref:"Aigrade"
