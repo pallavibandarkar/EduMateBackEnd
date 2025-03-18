@@ -13,6 +13,7 @@ const MongoStore = require('connect-mongo');
 const User = require("./models/user.js")
 const userRouter = require("./routes/user.js")
 const classRouter = require("./routes/class.js")
+const agenda = require("./utils/ajenda.js")
 
 const dburl =process.env.ATLAS_DBURL
 main()
@@ -74,6 +75,8 @@ app.get("/hello",(req,res)=>{
 app.get("/user", (req, res) => {
     res.send({ session: req.session, user: req.user });
 });
+
+agenda.start().then(() => console.log("Agenda started"));
 
 app.listen(8080,()=>{
     console.log("Listening on port 8080");

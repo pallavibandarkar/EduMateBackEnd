@@ -9,14 +9,14 @@ const nodemailer = require("nodemailer");
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.EMAIL,  // Your Gmail ID
-        pass: process.env.EMAIL_PASSWORD     // Your App Password (Not your Gmail password)
+        user: process.env.EMAIL,  
+        pass: process.env.EMAIL_PASSWORD 
     }
 });
 
 const mailOptions = {
-    from: "your-email@gmail.com",
-    to: "recipient-email@gmail.com",  // Change this to your own email for testing
+    from: process.env.EMAIL,
+    to: "pallavibandarkar2@gmail.com", 
     subject: "Test Email from Nodemailer",
     text: "Hello! This is a test email to check if Nodemailer is working."
 };

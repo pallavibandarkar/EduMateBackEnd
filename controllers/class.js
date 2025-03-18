@@ -9,6 +9,17 @@ const upload = multer({storage})
 const axios = require('axios')
 const Aigrade = require('../models/aigrading.js')
 const cloudinary = require('cloudinary').v2;
+const agenda = require("../utils/ajenda.js")
+const nodemailer = require("nodemailer");
+
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.EMAIL,  
+        pass: process.env.EMAIL_PASSWORD 
+    }
+});
+
 
 
 module.exports.createClass = async(req,res)=>{
@@ -149,7 +160,8 @@ module.exports.uploadAss =async(req,res)=>{
         let {id} = req.params;
         const uploadedFile = req.file;
 
-        const findClass = await Class.findById(id);
+        const findClass = await Class.findById(id).populate({ path: "students", select: "email name" }).populate("classTeacher");;
+        console.log("class is : "+findClass)
 
         if(!findClass.classTeacher.equals(req.user._id)){
            const result = await cloudinary.uploader.destroy(uploadedFile.filename); 
@@ -172,13 +184,28 @@ module.exports.uploadAss =async(req,res)=>{
         })
 
         const result = await newAssignment.save();
-        console.log(result)
         await Class.findByIdAndUpdate(id, { $push: { assignments: newAssignment._id } });
-        res.status(201).json({ message: "Assignment uploaded successfully!", assignment: newAssignment });
 
+        findClass.students.forEach(student => {
+            transporter.sendMail({
+                from: process.env.EMAIL,
+                to: student.email,
+                subject: "New Assignment Uploaded",
+                text: `Hello ${student.name},\n\nA new assignment '${title}' has been uploaded.\nDeadline: ${deadline}\n\nPlease submit it before the deadline.\n\nBest,\nYour ${findClass.classTeacher.username}`
+            });
+        });
+
+        const reminderTime = new Date(deadline);
+        reminderTime.setDate(reminderTime.getDate() - 1); 
+
+        const agendaSchedule = await agenda.schedule(reminderTime, "send assignment reminder", { assignmentId: newAssignment._id });
+        console.log("Agenda Schedule : ",agendaSchedule)
+
+        res.status(201).send({ message: "Assignment uploaded & emails scheduled!",assignment: newAssignment });
+
+       // res.status(201).json({ message: "Assignment uploaded successfully!", assignment: newAssignment });
        }catch(err){
         console.log(err)
-        console.error(err);
         res.status(500).json({ error: "Failed to upload assignment." });
        }
     
@@ -187,7 +214,7 @@ module.exports.uploadAss =async(req,res)=>{
 module.exports.getallClasses = async(req,res)=>{
     try {
         let { _id } = req.user;
-        const classes = await Class.find({ students: _id })
+        const classes = await Class.find({$or: [{ students: _id }, { classTeacher: _id }]})
         .populate({ path: "classTeacher" }) 
         .populate({ path: "students" }) 
         .populate({ path: "assignments",populate: { path: "submissions" } }) 
