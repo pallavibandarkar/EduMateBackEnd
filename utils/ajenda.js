@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
 agenda.define("send assignment reminder", async (job) => {
     const { assignmentId } = job.attrs.data;
     
-    const assignment = await Assignment.findById(assignmentId).populate("class").populate(" uploaded_by");
+    const assignment = await Assignment.findById(assignmentId).populate("class").populate("uploaded_by");
     if (!assignment) return;
 
     const classData = await Class.findById(assignment.class).populate("students");

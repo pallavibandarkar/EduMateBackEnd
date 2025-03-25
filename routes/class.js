@@ -30,6 +30,51 @@ route.get("/getClasses",isLoggedin,classControllers.getallClasses)
 
 route.get("/getClass/:id",isLoggedin,classControllers.viewClass)
 
+route.get("/getGrading/:id",isLoggedin,classControllers.getGradings)
+
+route.get('/submissions/:id', isLoggedin,async (req, res) => {
+    try {
+        const { id } = req.params;
+        const classData = await Class.findById(id)
+        .populate({
+            path: 'assignments',
+            populate: [
+                {
+                    path: 'submissions',
+                    populate: {
+                        path: 'studentId', // Populate studentId in submissions
+                    }
+                },
+                {
+                    path: 'submissions',
+                    populate: {
+                        path: 'aiGrade' // Populate aiGrade in submissions
+                    }
+                },
+                {
+                    path: 'submissions',
+                    populate: {
+                        path: 'assignmentId' // Populate aiGrade in submissions
+                    }
+                },
+                
+            ]
+            
+        })
+        .populate('students');
+        
+            //.populate('aiGrade')
+        if (!classData) {
+            return res.status(404).send({ message: 'Class not found' });
+        }
+        const submissions = classData.assignments.flatMap(assignment => assignment.submissions);
+
+        res.send({msg:"Class found successfully" ,submissions:submissions });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 module.exports = route;
 

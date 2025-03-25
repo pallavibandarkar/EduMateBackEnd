@@ -13,7 +13,9 @@ const MongoStore = require('connect-mongo');
 const User = require("./models/user.js")
 const userRouter = require("./routes/user.js")
 const classRouter = require("./routes/class.js")
+const announcementRouter = require("./routes/announcement.js")
 const agenda = require("./utils/ajenda.js")
+
 
 const dburl =process.env.ATLAS_DBURL
 main()
@@ -65,8 +67,7 @@ passport.deserializeUser(User.deserializeUser());
 
 app.use("/profile",userRouter);
 app.use('/class',classRouter)
-
-
+app.use("/announcement",announcementRouter)
 
 app.get("/hello",(req,res)=>{
     res.send("Welcome to edumate!!!");
@@ -74,6 +75,15 @@ app.get("/hello",(req,res)=>{
 
 app.get("/user", (req, res) => {
     res.send({ session: req.session, user: req.user });
+});
+
+app.use((err, req, res, next) => {
+    console.error(err.stack); // Log the error stack for debugging
+    res.status(500).json({ message: 'Something went wrong!', error: err.message });
+});
+
+app.use((req, res, next) => {
+    res.status(404).json({ message: 'Not Found' });
 });
 
 agenda.start().then(() => console.log("Agenda started"));

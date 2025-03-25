@@ -11,6 +11,7 @@ const Aigrade = require('../models/aigrading.js')
 const cloudinary = require('cloudinary').v2;
 const agenda = require("../utils/ajenda.js")
 const nodemailer = require("nodemailer");
+const assignment = require("../models/assignment.js")
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -27,7 +28,6 @@ module.exports.createClass = async(req,res)=>{
         let {_id} = req.user;
         let {className , div}=req.body;
         const updateUser = await User.findByIdAndUpdate(_id,{role:"teacher"},{new:true});
-        console.log("Updated User is ",updateUser)
         const newClass = new Class({
             className:className,
             classTeacher:req.user._id,
@@ -54,7 +54,7 @@ module.exports.createClass = async(req,res)=>{
 
 module.exports.joinClass =  async (req, res) => {
     try {
-        let { _id } = req.user; // Logged-in user
+        let { _id } = req.user; 
         let { classCode } = req.body;
 
         // Find class by classCode
@@ -91,7 +91,6 @@ module.exports.joinClass =  async (req, res) => {
 module.exports.aiGradingAndSubmission = async (req, res) => {
     try {
         const assignmentId = req.params.id
-        console.log(req.user._id)
         const studentId = req.user._id
     
         const assignment = await Assignment.findById(assignmentId);
@@ -127,8 +126,6 @@ module.exports.aiGradingAndSubmission = async (req, res) => {
         const fileUrl = submission.file.url;
 
         const response = await axios.post('http://127.0.0.1:5001/grade', { file_url: fileUrl });
-        console.log(response.data[0])
-
         if (!response.data || response.data.length === 0) {
             return res.status(500).json({ error: 'Failed to get valid grading results' });
         }
@@ -160,12 +157,10 @@ module.exports.uploadAss =async(req,res)=>{
         let {id} = req.params;
         const uploadedFile = req.file;
 
-        const findClass = await Class.findById(id).populate({ path: "students", select: "email name" }).populate("classTeacher");;
-        console.log("class is : "+findClass)
-
+        const findClass = await Class.findById(id).populate({ path: "students", select: "email name" }).populate("classTeacher");
+        
         if(!findClass.classTeacher.equals(req.user._id)){
            const result = await cloudinary.uploader.destroy(uploadedFile.filename); 
-           console.log(result)
            return res.status(401).send({msg:"You dont have permission to access this class!"})
         }
 
@@ -185,25 +180,34 @@ module.exports.uploadAss =async(req,res)=>{
 
         const result = await newAssignment.save();
         await Class.findByIdAndUpdate(id, { $push: { assignments: newAssignment._id } });
+        const studentEmails = findClass.students.map(student => student.email);
 
-        findClass.students.forEach(student => {
-            transporter.sendMail({
-                from: process.env.EMAIL,
-                to: student.email,
-                subject: "New Assignment Uploaded",
-                text: `Hello ${student.name},\n\nA new assignment '${title}' has been uploaded.\nDeadline: ${deadline}\n\nPlease submit it before the deadline.\n\nBest,\nYour ${findClass.classTeacher.username}`
-            });
-        });
+        if (studentEmails.length > 0) {
+            for (const student of findClass.students) {
+                await transporter.sendMail({
+                    from: process.env.EMAIL,
+                    to: student.email,  
+                    replyTo: process.env.EMAIL,
+                    subject: `New Assignment for '${title}'`,
+                    text: `Hello Dear Students,\n\nA new assignment '${title}' has been uploaded.\n📅 Deadline: ${deadline}\n\nSubmit before the deadline.\n\nBest,\nYour Teacher: ${findClass.classTeacher.username}`,
+                    html: `<p>Hello <b>${student.name}</b>,</p>
+                           <p>A new assignment <b>'${title}'</b> has been uploaded.</p>
+                           <p>📅 <b>Deadline:</b> ${deadline}</p>
+                           <p>Submit it before the deadline.</p>
+                           <br>
+                           <p>Best,</p>
+                           <p>Your Teacher: <b>${findClass.classTeacher.username}</b></p>
+                           <p>If you wish to unsubscribe from these notifications, please click <a href="unsubscribe_link">here</a>.</p>`
+                });
+            }
+        }
 
         const reminderTime = new Date(deadline);
         reminderTime.setDate(reminderTime.getDate() - 1); 
 
         const agendaSchedule = await agenda.schedule(reminderTime, "send assignment reminder", { assignmentId: newAssignment._id });
-        console.log("Agenda Schedule : ",agendaSchedule)
 
         res.status(201).send({ message: "Assignment uploaded & emails scheduled!",assignment: newAssignment });
-
-       // res.status(201).json({ message: "Assignment uploaded successfully!", assignment: newAssignment });
        }catch(err){
         console.log(err)
         res.status(500).json({ error: "Failed to upload assignment." });
@@ -217,7 +221,11 @@ module.exports.getallClasses = async(req,res)=>{
         const classes = await Class.find({$or: [{ students: _id }, { classTeacher: _id }]})
         .populate({ path: "classTeacher" }) 
         .populate({ path: "students" }) 
-        .populate({ path: "assignments",populate: { path: "submissions" } }) 
+        .populate({
+            path: "assignments",
+            populate: { path: "submissions" } // Populate submissions here
+        })
+        .populate({path:"announcements"})
         res.status(200).send({ classes:classes });
 
     } catch (err) {
@@ -232,7 +240,12 @@ module.exports.viewClass = async(req,res)=>{
         const result = await Class.findById(id)
         .populate({ path: "classTeacher" }) 
         .populate({ path: "students" }) 
-        .populate({ path: "assignments" }) ;
+        .populate({path:"announcements"})
+        .populate({
+            path: "assignments",
+            options: { sort: { createdAt: -1 } },
+            populate: { path: "submissions" } // Populate submissions here
+        });
         if(!result){
             return res.send({msg:"Class Not found for given id"})
         }
@@ -241,3 +254,26 @@ module.exports.viewClass = async(req,res)=>{
         res.send({msg:"Class Not found for given id",error:err})
     }
 }
+
+module.exports.getGradings = async (req, res) => {
+    try {
+        const { id } = req.params; 
+        if (!id) {
+            return res.status(400).send({ msg: "ID is required" });
+        }
+
+        const result = await Submission.findById(id);
+        if (!result) {
+            return res.status(404).send({ msg: "Submission not found" });
+        }
+
+        const gradings = await Aigrade.findById(result.aiGrade);
+        if (!gradings) {
+            return res.status(404).send({ msg: "AI grading not found" });
+        }
+
+        res.send({ msg: "AI gradings found", data: gradings, assignment: result });
+    } catch (err) {
+        res.status(500).send({ err, msg: "Grading not found!!" });
+    }
+};
