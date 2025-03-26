@@ -244,7 +244,7 @@ module.exports.viewClass = async(req,res)=>{
         .populate({
             path: "assignments",
             options: { sort: { createdAt: -1 } },
-            populate: { path: "submissions" } // Populate submissions here
+            populate: { path: "submissions" } 
         });
         if(!result){
             return res.send({msg:"Class Not found for given id"})
